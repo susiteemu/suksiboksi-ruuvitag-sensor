@@ -1,7 +1,22 @@
 from ruuvitag_sensor.ruuvi import RuuviTagSensor
 from influxdb import InfluxDBClient
+import os
 import logging
 import click
+
+logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s')
+
+current_dir = os.path.dirname(os.path.realpath(__file__))
+
+RUUVI_DB='ruuvi'
+
+client = InfluxDBClient(host='localhost', port=8086)
+
+databases = list(map(lambda c: c['name'], client.get_list_database()))
+if RUUVI_DB not in databases:
+    client.create_database(RUUVI_DB)
+
+client.switch_database(RUUVI_DB)
 
 def write_to_influxdb(mac, device_label, payload):
     logging.info(f'Received data from {mac}')
@@ -39,20 +54,12 @@ def write_to_influxdb(mac, device_label, payload):
 @click.option('--mac-address', required=True, help='Device MAC address to monitor')
 @click.option('--device-label', required=True, help='Device label to add to InfluxDB measurement')
 def start_measurement(mac_address, device_label):
-    logging.info(f'Starting measurement for {mac_address} with label {device_label}')
     macs = [mac_address]
     timeout_in_sec = 5
     datas = RuuviTagSensor.get_data_for_sensors(macs, timeout_in_sec)
-    logging.info(f'... got measured data (or timeout occurred)')
     for mac in datas:
         write_to_influxdb(mac, device_label, datas[mac])
 
-if __name__ == "__main__":
-    logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s')
-    RUUVI_DB='ruuvi'
-    client = InfluxDBClient(host='localhost', port=8086)
-    databases = list(map(lambda c: c['name'], client.get_list_database()))
-    if RUUVI_DB not in databases:
-        client.create_database(RUUVI_DB)
-    client.switch_database(RUUVI_DB)
+
+if __name__ == '__main___':
     start_measurement()
