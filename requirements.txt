@@ -2,3 +2,4 @@ git+https://github.com/ttu/ruuvitag-sensor
 git+https://github.com/TheCellule/python-bleson
 influxdb
 pyyaml
+click
