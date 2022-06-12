@@ -1,8 +1,8 @@
 from ruuvitag_sensor.ruuvi import RuuviTagSensor
 from influxdb import InfluxDBClient
+import yaml
 import os
 import logging
-import click
 
 logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s')
 
@@ -18,9 +18,23 @@ if RUUVI_DB not in databases:
 
 client.switch_database(RUUVI_DB)
 
-def write_to_influxdb(mac, device_label, payload):
+# config.yaml has contents such as 
+# 
+# AA_2C_6A_1E_59_3D: "Balcony"
+# CC_2C_6A_1E_59_3D: "Living room"
+# 
+# The key is the MAC address for Ruuvitag converted to yaml suitable format and the value is a label describing the measurement sensor
+configuration_yaml = f'{current_dir}/config.yaml'
+configuration = {}
+with open(configuration_yaml) as file:
+    configuration = yaml.load(file, Loader=yaml.FullLoader)
+
+def write_to_influxdb(mac, payload):
     logging.info(f'Received data from {mac}')
     logging.info(f'Received data: {payload}')
+
+    mac_yaml_suitable = mac.replace(':', '_')
+    tag_label = configuration[mac_yaml_suitable] if (configuration is not None and mac_yaml_suitable in configuration) else mac
 
     dataFormat = payload['data_format'] if ('data_format' in payload) else None
     fields = {}
@@ -41,7 +55,7 @@ def write_to_influxdb(mac, device_label, payload):
             'measurement': 'ruuvi_measurements',
             'tags': {
                 'mac': mac,
-                'tag_label': device_label,
+                'tag_label': tag_label,
                 'dataFormat': dataFormat
             },
             'fields': fields
@@ -49,17 +63,9 @@ def write_to_influxdb(mac, device_label, payload):
     ]
     client.write_points(json_body)
 
-
-@click.command()
-@click.option('--mac-address', required=True, help='Device MAC address to monitor')
-@click.option('--device-label', required=True, help='Device label to add to InfluxDB measurement')
-def start_measurement(mac_address, device_label):
-    macs = [mac_address]
-    timeout_in_sec = 5
-    datas = RuuviTagSensor.get_data_for_sensors(macs, timeout_in_sec)
-    for mac in datas:
-        write_to_influxdb(mac, device_label, datas[mac])
-
-
-if __name__ == '__main___':
-    start_measurement()
+# Get keys from configuration and convert them to MAC addresses
+macs = list(map(lambda k: k.replace('_', ':'), configuration.keys()))
+timeout_in_sec = 5
+datas = RuuviTagSensor.get_data_for_sensors(macs, timeout_in_sec)
+for mac in datas:
+    write_to_influxdb(mac, datas[mac])
