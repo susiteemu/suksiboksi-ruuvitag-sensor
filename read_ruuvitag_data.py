@@ -65,7 +65,7 @@ def write_to_influxdb(mac, payload):
 
 # Get keys from configuration and convert them to MAC addresses
 macs = list(map(lambda k: k.replace('_', ':'), configuration.keys()))
-timeout_in_sec = 5
+timeout_in_sec = 10
 datas = RuuviTagSensor.get_data_for_sensors(macs, timeout_in_sec)
 for mac in datas:
     write_to_influxdb(mac, datas[mac])
